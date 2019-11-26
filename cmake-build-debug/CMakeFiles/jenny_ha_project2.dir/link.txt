@@ -1,0 +1,1 @@
+/usr/bin/c++  -g   CMakeFiles/jenny_ha_project2.dir/main.cpp.o  -o jenny_ha_project2 
