@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <cstring>
 
 // https://www.geeksforgeeks.org/c-program-red-black-tree-insertion/
 using namespace std;
@@ -41,13 +42,53 @@ public:
     RedBlackTree() {
         root = NULL;
     }
-    Node* initialize(vector<string> *nodeData);
+    void initialize(vector<string> *nodeData);
     Node* insert(int v);
     void remove(int v);
     void search(int v);
 
 };
 vector<Node*> allNodes;
+
+int height(Node* node)
+{
+    if (node == NULL)
+        return 0;
+    else
+    {
+        int lheight = height(node->left);
+        int rheight = height(node->right);
+
+        if (lheight > rheight)
+            return(lheight + 1);
+        else return(rheight + 1);
+    }
+}
+void printGivenLevel(Node* root, int level)
+{
+    if (root == NULL) {
+        return;
+    }
+    if (level == 1) {
+        char color = ((root->color) ? 'b' : 'r');
+        cout << "(" << root->key << color << ")" << " ";
+    }
+    else if (level > 1)
+    {
+        printGivenLevel(root->left, level-1);
+        printGivenLevel(root->right, level-1);
+    }
+}
+void printLevelOrder(Node* root)
+{
+    int h = height(root);
+    int i;
+    for (i = 1; i <= h; i++) {
+        printGivenLevel(root, i);
+//        cout << endl;
+    }
+    cout << endl;
+}
 Node* strToNode(string data) {
     Node *n;
     char color = data.back();
@@ -88,7 +129,7 @@ Node *construct(vector<string> nodes, int start, int end) {
     return node;
 }
 
-Node *RedBlackTree::initialize(vector<string> *nodes) {
+void RedBlackTree::initialize(vector<string> *nodes) {
     root = construct(*nodes, 0, nodes->size()-1);
 }
 
@@ -109,6 +150,7 @@ Node* RedBlackTree::insert(int v) {
     Node *node = new Node(v,RED);
     root = insertBST(root,node);
     rbTreeify(node);
+    printLevelOrder(root);
 }
 
 void RedBlackTree::rotateLeft(Node *node) {
@@ -146,6 +188,7 @@ void RedBlackTree::rotateRight(Node *node) {
     node->parent = left;
 }
 
+// Restructure tree to fit Red-Black tree properties
 void RedBlackTree::rbTreeify(Node *node) {
     Node *parentOfNode = NULL;
     Node *gParentOfNode = NULL;
@@ -207,11 +250,34 @@ void RedBlackTree::rbTreeify(Node *node) {
     }
     root-> color = BlACK;
 }
+vector<string> split(string str,string sep){
+    char* cstr=const_cast<char*>(str.c_str());
+    char* current;
+    std::vector<std::string> arr;
+    current=strtok(cstr,sep.c_str());
+    while(current!=NULL){
+        arr.push_back(current);
+        current=strtok(NULL,sep.c_str());
+    }
+    return arr;
+}
+string trim(string str)
+{
+    size_t first = str.find_first_not_of(' ');
+    if (string::npos == first)
+    {
+        return str;
+    }
+    size_t last = str.find_last_not_of(' ');
+    return str.substr(first, (last - first + 1));
+}
+
 int main(int argc, char **argv) {
     std::cout << argv[1] << std::endl;
     vector<string> nodeInputs;
     int searchThreads;
     int modThreads;
+    vector<string> ops;
 
     if (argv[1]) {
         string contents;
@@ -225,29 +291,70 @@ int main(int argc, char **argv) {
             // get existing Node data
             if (line == 0) {
                 string token;
-                while (getline(ss, token, ',')) {
-                    nodeInputs.push_back(token);
+                getline(ss,token);
+                nodeInputs = split(token,",");
+                if(nodeInputs.size()==0){
+                    cout << "empty"<<endl;
                 }
+//                nodeInputs.push_back(NULL);
+                cout << nodeInputs.size() << endl;
             }
             // get number of search threads
             if (line == 2) {
-
+                string token;
+                getline(ss,token);
+                searchThreads = stoi(token.substr(token.find(':')+2));
             }
             // get number of modification threads
             if (line == 3) {
-
+                string token;
+                getline(ss,token);
+                modThreads = stoi(token.substr(token.find(':')+2));
             }
             // get operations data
-            if (line > 4) {}
+            if (line > 4) {
+                string token;
+                getline(ss,token);
+                vector<string> lineOps = split(token,"||");
+                for(string op: lineOps){
+                    ops.push_back(trim(op));
+                }
+            }
 
             line++;
         }
+
         infile.close();
         RedBlackTree *rbtree = new RedBlackTree();
         rbtree->initialize(&nodeInputs);
-        cout << "root: " << rbtree->root->key << endl;
-        rbtree->insert(1);
-        for(Node* n: allNodes){
+        if(rbtree->root){
+            cout << "root: " << rbtree->root->key << endl;
+        }
+
+        for(string op: ops){
+            char command = op.front();
+            int key = stoi(op.substr(op.find('(')+1,op.find(')')-1));
+            if(command=='i'){
+                rbtree->insert(key);
+            }
+            if(command=='s'){
+
+            }
+            if(command=='d'){
+
+            }
+
+        }
+
+
+
+//        printLevelOrder(rbtree->root);
+    }
+    return 0;
+}
+
+/*
+ *   for(Node* n: allNodes){
             char color = ((n->color) ? 'b' : 'r');
             cout << "(" << n->key << color << ")" << " ";
             if(n->left){
@@ -261,11 +368,7 @@ int main(int argc, char **argv) {
             cout << endl;
 
         }
-    }
-    return 0;
-}
-
-
+ * */
 
 /*
  *
