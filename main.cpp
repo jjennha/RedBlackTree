@@ -45,10 +45,9 @@ public:
     void initialize(vector<string> *nodeData);
     Node* insert(int v);
     void remove(int v);
-    void search(int v);
+    bool search(int v);
 
 };
-vector<Node*> allNodes;
 
 int height(Node* node)
 {
@@ -106,7 +105,13 @@ Node* strToNode(string data) {
     }
     return n;
 }
-
+/**
+ * Helper method to contruct tree recursively
+ * @param nodes
+ * @param start
+ * @param end
+ * @return
+ */
 Node *construct(vector<string> nodes, int start, int end) {
     if (start > end || nodes[start]=="f") { return NULL; }
     Node *node = strToNode(nodes[start]);
@@ -125,34 +130,19 @@ Node *construct(vector<string> nodes, int start, int end) {
     if(node->right){
         node->right->parent = node;
     }
-    allNodes.push_back(node);
     return node;
 }
-
+/**
+ * Initializes tree with predefined nodes if any
+ * @param nodes
+ */
 void RedBlackTree::initialize(vector<string> *nodes) {
     root = construct(*nodes, 0, nodes->size()-1);
 }
-
-Node* insertBST(Node* root, Node* node){
-    if(root == NULL){return node;}
-    if(node->key < root->key){
-        root->left = insertBST(root->left, node);
-        root->left->parent = root;
-    }
-    else if(node->key > root->key){
-        root->right = insertBST(root->right, node);
-        root->right->parent = root;
-    }
-    return root;
-}
-
-Node* RedBlackTree::insert(int v) {
-    Node *node = new Node(v,RED);
-    root = insertBST(root,node);
-    rbTreeify(node);
-    printLevelOrder(root);
-}
-
+/**
+ * Rotates subtree left to maintain Red-Black tree properties
+ * @param node
+ */
 void RedBlackTree::rotateLeft(Node *node) {
     Node* right = node->right;
     node->right = right->left;
@@ -170,6 +160,10 @@ void RedBlackTree::rotateLeft(Node *node) {
     right->left = node;
     node->parent = right;
 }
+/**
+ * Rotates subtree right to maintain Red-Black tree properties
+ * @param node
+ */
 void RedBlackTree::rotateRight(Node *node) {
     Node* left = node->left;
     node->left = node->right;
@@ -188,7 +182,10 @@ void RedBlackTree::rotateRight(Node *node) {
     node->parent = left;
 }
 
-// Restructure tree to fit Red-Black tree properties
+/**
+ * Restructure via recoloring and/or rotating tree to fit Red-Black tree properties.
+ * @param node
+ */
 void RedBlackTree::rbTreeify(Node *node) {
     Node *parentOfNode = NULL;
     Node *gParentOfNode = NULL;
@@ -222,7 +219,7 @@ void RedBlackTree::rbTreeify(Node *node) {
                 node = parentOfNode;
             }
         }
-        // (2) if parent parent of node is right child of grandparent of node
+            // (2) if parent parent of node is right child of grandparent of node
         else{
             Node *uncleOfNode = gParentOfNode;
 
@@ -246,21 +243,62 @@ void RedBlackTree::rbTreeify(Node *node) {
 
             }
         }
-
     }
     root-> color = BlACK;
 }
-vector<string> split(string str,string sep){
+
+/**
+ * Recursive helper method to insert node into BST
+ * @param root
+ * @param node
+ * @return root node
+ */
+Node* insertBST(Node* root, Node* node){
+    if(root == NULL){return node;}
+    if(node->key < root->key){
+        root->left = insertBST(root->left, node);
+        root->left->parent = root;
+    }
+    else if(node->key > root->key){
+        root->right = insertBST(root->right, node);
+        root->right->parent = root;
+    }
+    return root;
+}
+/**
+ * Insert node into BST
+ * @param v
+ * @return
+ */
+Node* RedBlackTree::insert(int v) {
+    Node *node = new Node(v,RED);
+    root = insertBST(root,node);
+    rbTreeify(node);
+    printLevelOrder(root);
+}
+
+/**
+ * Splits string into array based on delimiter
+ * @param str
+ * @param sep
+ * @return
+ */
+vector<string> split(string str,string del){
     char* cstr=const_cast<char*>(str.c_str());
     char* current;
     std::vector<std::string> arr;
-    current=strtok(cstr,sep.c_str());
+    current=strtok(cstr,del.c_str());
     while(current!=NULL){
         arr.push_back(current);
-        current=strtok(NULL,sep.c_str());
+        current=strtok(NULL,del.c_str());
     }
     return arr;
 }
+/**
+ * Trims white space from string
+ * @param str
+ * @return
+ */
 string trim(string str)
 {
     size_t first = str.find_first_not_of(' ');
@@ -270,6 +308,25 @@ string trim(string str)
     }
     size_t last = str.find_last_not_of(' ');
     return str.substr(first, (last - first + 1));
+}
+
+bool recSearch(Node* root, int key){
+    if(root == NULL){
+        cout << "False: could not find "<< key << endl;
+        return false;
+    }
+    if(root->key == key){
+        cout << "True: found node " << root->key << " on thread #" << endl;
+        return true;
+    }
+    if(root->key < key){
+        return recSearch(root->right,key);
+    }
+    return recSearch(root->left,key);
+}
+
+bool RedBlackTree::search(int v) {
+    return recSearch(root,v);
 }
 
 int main(int argc, char **argv) {
@@ -323,8 +380,8 @@ int main(int argc, char **argv) {
 
             line++;
         }
-
         infile.close();
+
         RedBlackTree *rbtree = new RedBlackTree();
         rbtree->initialize(&nodeInputs);
         if(rbtree->root){
@@ -338,15 +395,12 @@ int main(int argc, char **argv) {
                 rbtree->insert(key);
             }
             if(command=='s'){
-
+                rbtree->search(key);
             }
             if(command=='d'){
 
             }
-
         }
-
-
 
 //        printLevelOrder(rbtree->root);
     }
