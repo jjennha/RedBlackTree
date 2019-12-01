@@ -329,6 +329,16 @@ bool RedBlackTree::search(int v) {
     return recSearch(root,v);
 }
 
+void recRemove(Node* root, int v){
+
+}
+void RedBlackTree::remove(int v){
+    if(!search(v)){
+        return;
+    }
+
+}
+
 int main(int argc, char **argv) {
     std::cout << argv[1] << std::endl;
     vector<string> nodeInputs;
