@@ -406,7 +406,7 @@ void RedBlackTree::remove_1(Node* n){
     if(n->parent == NULL){
         return;
     }
-    remove_1(n);
+    remove_2(n);
 }
 void RedBlackTree::remove_2(Node* n){
     if(sibling(n)->color == RED){
