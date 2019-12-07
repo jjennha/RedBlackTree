@@ -12,6 +12,8 @@
     <list default="true" id="156e760b-cbee-4151-9c7f-bd4c5280a19b" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rbtree" beforeDir="false" afterPath="$PROJECT_DIR$/rbtree" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/test1" beforeDir="false" afterPath="$PROJECT_DIR$/test/test1" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -61,6 +63,7 @@
       <option name="presentableId" value="Default" />
       <updated>1574820867610</updated>
       <workItem from="1574820869992" duration="50252000" />
+      <workItem from="1575750653539" duration="7520000" />
     </task>
     <servers />
   </component>
@@ -72,7 +75,9 @@
       <map>
         <entry key="MAIN">
           <value>
-            <State />
+            <State>
+              <option name="COLUMN_ORDER" />
+            </State>
           </value>
         </entry>
       </map>

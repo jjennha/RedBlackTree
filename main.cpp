@@ -36,6 +36,14 @@ private:
     void rotateLeft(Node* node);
     void rotateRight(Node* node);
     void rbTreeify(Node* node);
+
+    void remove_1(Node* node);
+    void remove_2(Node* node);
+    void remove_3(Node* node);
+    void remove_4(Node* node);
+    void remove_5(Node* node);
+    void remove_6(Node* node);
+    void replace(Node* o, Node* n);
 public:
     Node *root;
 
@@ -45,8 +53,37 @@ public:
     void initialize(vector<string> *nodeData);
     Node* insert(int v);
     void remove(int v);
-    bool search(int v);
-
+    Node* search(int v);
+    Node* sibling(Node* n) {
+        if(n == NULL || n->parent == NULL){
+            return n;
+        }
+        if(n->parent->right != NULL &&n->parent->right == n){
+            return n->parent->left;
+        }else if(n->parent->left != NULL){
+            return n->parent->right;
+        }
+        return n;
+    }
+    Node* uncle(Node* n){
+        if(n == NULL || n->parent == NULL || n->parent->parent == NULL){
+            return n;
+        }
+        return sibling(n->parent);
+    }
+    Node* grandparent(Node* n){
+        if(n == NULL || n->parent == NULL || n->parent->parent != NULL){
+            return n;
+        }
+        return n->parent->parent;
+    }
+    Node* predecessor(Node* n){
+        if(n==NULL){return n;}
+        while(n->right != NULL){
+            n = n->right;
+        }
+        return n;
+    }
 };
 
 int height(Node* node)
@@ -310,14 +347,14 @@ string trim(string str)
     return str.substr(first, (last - first + 1));
 }
 
-bool recSearch(Node* root, int key){
+Node* recSearch(Node* root, int key){
     if(root == NULL){
         cout << "False: could not find "<< key << endl;
-        return false;
+        return root;
     }
     if(root->key == key){
         cout << "True: found node " << root->key << " on thread #" << endl;
-        return true;
+        return root;
     }
     if(root->key < key){
         return recSearch(root->right,key);
@@ -325,18 +362,115 @@ bool recSearch(Node* root, int key){
     return recSearch(root->left,key);
 }
 
-bool RedBlackTree::search(int v) {
+Node* RedBlackTree::search(int v) {
     return recSearch(root,v);
 }
 
-void recRemove(Node* root, int v){
-
+void RedBlackTree::replace(Node* oldn, Node* newn)
+{
+    if (oldn->parent == NULL)
+    {
+        root = newn;
+    }
+    else
+    {
+        if (oldn == oldn->parent->left)
+            oldn->parent->left = newn;
+        else
+            oldn->parent->right = newn;
+    }
+    if (newn != NULL)
+    {
+        newn->parent = oldn->parent;
+    }
 }
 void RedBlackTree::remove(int v){
-    if(!search(v)){
+    Node* vNode = search(v);
+    if(vNode == NULL){return;}
+    if(vNode->left != NULL && vNode->right != NULL){
+        Node* pred = predecessor(vNode->left);
+        vNode->key = pred->key;
+        vNode = pred;
+    }
+    Node* child;
+    if(vNode->left != NULL || vNode->right != NULL){return;}
+    child = (vNode->right == NULL)? vNode->left : vNode->right;
+    if(vNode->color == BlACK){
+        vNode->color = child->color;
+        remove_1(vNode);
+    }
+    replace(vNode,child);
+    rbTreeify(root);
+}
+void RedBlackTree::remove_1(Node* n){
+    if(n->parent == NULL){
         return;
     }
-
+    remove_1(n);
+}
+void RedBlackTree::remove_2(Node* n){
+    if(sibling(n)->color == RED){
+        n->parent->color = RED;
+        sibling(n)->color = BlACK;
+        if(n==n->parent->left){
+            rotateLeft(n->parent);
+        }else{
+            rotateRight(n->parent);
+        }
+    }
+    remove_3(n);
+}
+void RedBlackTree::remove_3(Node *n) {
+    if (n->parent->color == BlACK && sibling(n)->color == BlACK
+        && sibling(n)->left->color == BlACK && sibling(n)->right->color == BlACK){
+        sibling(n)->color = RED;
+        remove_1(n->parent);
+    }
+    else
+        remove_4(n);
+}
+void RedBlackTree::remove_4(Node *n) {
+    if (n->parent->color == RED && sibling(n)->color == BlACK &&
+        sibling(n)->left->color == BlACK && sibling(n)->right->color == BlACK)
+    {
+        sibling(n)->color = RED;
+        n->parent->color = BlACK;
+    }
+    else
+        remove_5(n);
+}
+void RedBlackTree::remove_5(Node *n) {
+    if (n == n->parent->left && sibling(n)->color == BlACK &&
+        sibling(n)->left->color == RED && sibling(n)->right->color == BlACK)
+    {
+        sibling(n)->color = RED;
+        sibling(n)->left->color = BlACK;
+        rotateRight(sibling(n));
+    }
+    else if (n == n->parent->right && sibling(n)->color == BlACK &&
+             sibling(n)->right->color == RED && sibling(n)->left->color == BlACK)
+    {
+        sibling(n)->color = RED;
+        sibling(n)->right->color = BlACK;
+        rotateLeft(sibling(n));
+    }
+    remove_6(n);
+}
+void RedBlackTree::remove_6(Node *n) {
+    sibling(n)->color = n->parent->color;
+    n->parent->color = BlACK;
+    if (n == n->parent->left)
+    {
+        if(sibling(n)->right->color != RED){return;}
+        sibling(n)->right->color = BlACK;
+        rotateLeft(n->parent);
+    }
+    else
+    {
+        if(sibling(n)->left->color != RED){return;}
+        sibling(n)->left->color = BlACK;
+        rotateRight(n->parent);
+    }
 }
 
 int main(int argc, char **argv) {
@@ -408,11 +542,11 @@ int main(int argc, char **argv) {
                 rbtree->search(key);
             }
             if(command=='d'){
-
+                rbtree->remove(key);
             }
         }
 
-//        printLevelOrder(rbtree->root);
+        printLevelOrder(rbtree->root);
     }
     return 0;
 }
