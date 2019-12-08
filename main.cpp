@@ -3,13 +3,24 @@
 #include <sstream>
 #include <vector>
 #include <cstring>
-
+#include <deque>
+#include <functional>
+#include <queue>
+# define COUNT 5
 // https://www.geeksforgeeks.org/c-program-red-black-tree-insertion/
 using namespace std;
+
+
+
+
 enum Color {
     RED, BlACK
 };
-
+struct task {
+    int id;
+    function<void()> f;
+//    function<void()> read();
+};
 struct Node {
     int key;
     Node *parent;
@@ -31,6 +42,37 @@ struct Node {
 
 };
 
+void print2DUtil(Node *root, int space)
+{
+    // Base case
+    if (root == NULL)
+        return;
+
+    // Increase distance between levels
+    space += COUNT;
+
+    // Process right child first
+    print2DUtil(root->right, space);
+
+    // Print current node after space
+    // count
+    cout<<endl;
+    for (int i = COUNT; i < space; i++)
+        cout<<" ";
+    char color = ((root->color) ? 'b' : 'r');
+    cout << "(" << root->key << color << ")" << " ";
+//    cout<<root->key<<color<<"\n";
+
+    // Process left child
+    print2DUtil(root->left, space);
+}
+// Wrapper over print2DUtil()
+void print2D(Node *root)
+{
+    // Pass initial space count as 0
+    print2DUtil(root, 0);
+    cout << endl;
+}
 class RedBlackTree {
 private:
     void rotateLeft(Node* node);
@@ -51,7 +93,7 @@ public:
         root = NULL;
     }
     void initialize(vector<string> *nodeData);
-    Node* insert(int v);
+    void insert(int v);
     void remove(int v);
     Node* search(int v);
     Node* sibling(Node* n) {
@@ -307,7 +349,7 @@ Node* insertBST(Node* root, Node* node){
  * @param v
  * @return
  */
-Node* RedBlackTree::insert(int v) {
+void RedBlackTree::insert(int v) {
     Node *node = new Node(v,RED);
     root = insertBST(root,node);
     rbTreeify(node);
@@ -488,34 +530,26 @@ int main(int argc, char **argv) {
         while (!infile.eof()) {
             getline(infile, contents);
             stringstream ss(contents);
-
+            string token;
+            getline(ss,token);
             // get existing Node data
             if (line == 0) {
-                string token;
-                getline(ss,token);
                 nodeInputs = split(token,",");
                 if(nodeInputs.size()==0){
                     cout << "empty"<<endl;
                 }
-//                nodeInputs.push_back(NULL);
                 cout << nodeInputs.size() << endl;
             }
             // get number of search threads
             if (line == 2) {
-                string token;
-                getline(ss,token);
                 searchThreads = stoi(token.substr(token.find(':')+2));
             }
             // get number of modification threads
             if (line == 3) {
-                string token;
-                getline(ss,token);
                 modThreads = stoi(token.substr(token.find(':')+2));
             }
             // get operations data
             if (line > 4) {
-                string token;
-                getline(ss,token);
                 vector<string> lineOps = split(token,"||");
                 for(string op: lineOps){
                     ops.push_back(trim(op));
@@ -531,7 +565,25 @@ int main(int argc, char **argv) {
         if(rbtree->root){
             cout << "root: " << rbtree->root->key << endl;
         }
-
+        queue<string> readers;
+        queue<string> writers;
+        for(string op: ops){
+            char command = op.front();
+            if(command=='i'){
+                writers.push(op);
+            }
+            if(command=='s'){
+                readers.push(op);
+            }
+            if(command=='d'){
+                writers.push(op);
+            }
+        }
+        print2D(rbtree->root);
+//        while(!readers.empty() || !writers.empty()){
+//
+//        }
+        // synchronized execution
         for(string op: ops){
             char command = op.front();
             int key = stoi(op.substr(op.find('(')+1,op.find(')')-1));
@@ -547,68 +599,7 @@ int main(int argc, char **argv) {
         }
 
         printLevelOrder(rbtree->root);
+        print2D(rbtree->root);
     }
     return 0;
 }
-
-/*
- *   for(Node* n: allNodes){
-            char color = ((n->color) ? 'b' : 'r');
-            cout << "(" << n->key << color << ")" << " ";
-            if(n->left){
-                char color = (n->left->color==0)? 'r':'b';
-                cout << "lChild: " << n->left->key << color << " | ";
-            }
-            if(n->right){
-                char color = (n->right->color==0)? 'r':'b';
-                cout << "rChild: " << n->right->key << color;
-            }
-            cout << endl;
-
-        }
- * */
-
-/*
- *
- *
-int height(Node* node)
-{
-    if (node == NULL)
-        return 0;
-    else
-    {
-int lheight = height(node->left);
-int rheight = height(node->right);
-
-if (lheight > rheight)
-return(lheight + 1);
-else return(rheight + 1);
-}
-}
-void printGivenLevel(Node* root, int level)
-{
-    if (root == NULL) {
-        return;
-    }
-    if (level == 1) {
-        char color = ((root->color) ? 'b' : 'r');
-        cout << "(" << root->key << color << ")" << " ";
-    }
-    else if (level > 1)
-    {
-        printGivenLevel(root->left, level-1);
-        printGivenLevel(root->right, level-1);
-    }
-}
-void printLevelOrder(Node* root)
-{
-    int h = height(root);
-    int i;
-    for (i = 1; i <= h; i++) {
-        printGivenLevel(root, i);
-        cout << endl;
-    }
-}
- *
- *
- * */
