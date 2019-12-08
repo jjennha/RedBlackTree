@@ -6,21 +6,18 @@
 #include <deque>
 #include <functional>
 #include <queue>
+#include <pthread.h>
+#include <zconf.h>
+
 # define COUNT 5
 // https://www.geeksforgeeks.org/c-program-red-black-tree-insertion/
 using namespace std;
 
-
-
-
 enum Color {
     RED, BlACK
 };
-struct task {
-    int id;
-    function<void()> f;
-//    function<void()> read();
-};
+
+
 struct Node {
     int key;
     Node *parent;
@@ -95,7 +92,7 @@ public:
     void initialize(vector<string> *nodeData);
     void insert(int v);
     void remove(int v);
-    Node* search(int v);
+    Node* search(int v,int thread);
     Node* sibling(Node* n) {
         if(n == NULL || n->parent == NULL){
             return n;
@@ -127,7 +124,13 @@ public:
         return n;
     }
 };
-
+RedBlackTree* rbtree = new RedBlackTree();
+struct thread_data {
+    int  thread_id;
+    char *message;
+    int key;
+//    RedBlackTree* rbtree;
+};
 int height(Node* node)
 {
     if (node == NULL)
@@ -389,23 +392,23 @@ string trim(string str)
     return str.substr(first, (last - first + 1));
 }
 
-Node* recSearch(Node* root, int key){
+Node* recSearch(Node* root, int key, int thread){
     if(root == NULL){
-        cout << "False: could not find "<< key << endl;
+        printf("False: could not find node %i on thread %i \n",key,thread);
         return root;
     }
     if(root->key == key){
-        cout << "True: found node " << root->key << " on thread #" << endl;
+        printf("True: found node %i on thread %i \n",root->key,thread);
         return root;
     }
     if(root->key < key){
-        return recSearch(root->right,key);
+        return recSearch(root->right,key,thread);
     }
-    return recSearch(root->left,key);
+    return recSearch(root->left,key,thread);
 }
 
-Node* RedBlackTree::search(int v) {
-    return recSearch(root,v);
+Node* RedBlackTree::search(int v, int thread) {
+    return recSearch(root,v,thread);
 }
 
 void RedBlackTree::replace(Node* oldn, Node* newn)
@@ -427,7 +430,7 @@ void RedBlackTree::replace(Node* oldn, Node* newn)
     }
 }
 void RedBlackTree::remove(int v){
-    Node* vNode = search(v);
+    Node* vNode = search(v,-1);
     if(vNode == NULL){return;}
     if(vNode->left != NULL && vNode->right != NULL){
         Node* pred = predecessor(vNode->left);
@@ -514,6 +517,154 @@ void RedBlackTree::remove_6(Node *n) {
         rotateRight(n->parent);
     }
 }
+void* search(void* threadarg){
+
+    struct thread_data *data;
+    data = (struct thread_data *) threadarg;
+//    RedBlackTree* rbtree = data->rbtree;
+    int key = data->key;
+    sleep(1);
+    rbtree->search(key, data->thread_id);
+//    printLevelOrder(rbtree->root);
+    pthread_exit(NULL);
+}
+
+class monitor {
+private:
+    // no. of readers
+    int rcnt;
+
+    // no. of writers
+    int wcnt;
+
+    // no. of readers waiting
+    int waitr;
+
+    // no. of writers waiting
+    int waitw;
+
+    // condition variable to check whether reader can read
+    pthread_cond_t canread;
+
+    // condition variable to check whether writer can write
+    pthread_cond_t canwrite;
+
+    // mutex for synchronisation
+    pthread_mutex_t condlock;
+
+public:
+    monitor()
+    {
+        rcnt = 0;
+        wcnt = 0;
+        waitr = 0;
+        waitw = 0;
+
+        pthread_cond_init(&canread, NULL);
+        pthread_cond_init(&canwrite, NULL);
+        pthread_mutex_init(&condlock, NULL);
+    }
+
+    // mutex provide synchronisation so that no other thread
+    // can change the value of data
+    void beginread(int i,int key)
+    {
+        pthread_mutex_lock(&condlock);
+
+        // if there are active or waiting writers
+        if (wcnt == 1 || waitw > 0) {
+            // incrementing waiting readers
+            waitr++;
+
+            // reader suspended
+            pthread_cond_wait(&canread, &condlock);
+            waitr--;
+        }
+
+        // else reader reads the resource
+        rcnt++;
+        rbtree->search(key,i);
+        pthread_mutex_unlock(&condlock);
+        pthread_cond_broadcast(&canread);
+    }
+
+    void endread(int i)
+    {
+
+        // if there are no readers left then writer enters monitor
+        pthread_mutex_lock(&condlock);
+
+        if (--rcnt == 0)
+            pthread_cond_signal(&canwrite);
+
+        pthread_mutex_unlock(&condlock);
+    }
+
+    void beginwrite(int i)
+    {
+        pthread_mutex_lock(&condlock);
+
+        // a writer can enter when there are no active
+        // or waiting readers or other writer
+        if (wcnt == 1 || rcnt > 0) {
+            ++waitw;
+            pthread_cond_wait(&canwrite, &condlock);
+            --waitw;
+        }
+        wcnt = 1;
+        cout << "writer " << i << " is writing\n";
+        pthread_mutex_unlock(&condlock);
+    }
+
+    void endwrite(int i)
+    {
+        pthread_mutex_lock(&condlock);
+        wcnt = 0;
+
+        // if any readers are waiting, threads are unblocked
+        if (waitr > 0)
+            pthread_cond_signal(&canread);
+        else
+            pthread_cond_signal(&canwrite);
+        pthread_mutex_unlock(&condlock);
+    }
+
+}
+
+// global object of monitor class
+        M;
+
+void* reader(void* td)
+{
+    struct thread_data *data;
+    data = (struct thread_data *) td;
+    int c = 0;
+    int i = (int) data->thread_id;
+    int key = data->key;
+    // each reader attempts to read 5 times
+    while (c < 2) {
+        usleep(1);
+        M.beginread(i,key);
+//        cout << "reading form thread: " << i << endl;
+
+        M.endread(i);
+        c++;
+    }
+}
+
+void* writer(void* id)
+{
+    int c = 0;
+    int i = *(int*)id;
+
+    // each writer attempts to write 5 times
+    while (c < 5) {
+        usleep(1);
+        M.beginwrite(i);
+        M.endwrite(i);
+        c++;
+    }
+}
 
 int main(int argc, char **argv) {
     std::cout << argv[1] << std::endl;
@@ -560,7 +711,6 @@ int main(int argc, char **argv) {
         }
         infile.close();
 
-        RedBlackTree *rbtree = new RedBlackTree();
         rbtree->initialize(&nodeInputs);
         if(rbtree->root){
             cout << "root: " << rbtree->root->key << endl;
@@ -579,27 +729,107 @@ int main(int argc, char **argv) {
                 writers.push(op);
             }
         }
-        print2D(rbtree->root);
-//        while(!readers.empty() || !writers.empty()){
-//
-//        }
-        // synchronized execution
-        for(string op: ops){
-            char command = op.front();
+        int size = readers.size();
+        pthread_t r[size], w[size];
+        struct thread_data td[searchThreads];
+        int i = 0;
+
+        while(!readers.empty() ){
+            string op = readers.front();
+            readers.pop();
             int key = stoi(op.substr(op.find('(')+1,op.find(')')-1));
-            if(command=='i'){
-                rbtree->insert(key);
-            }
-            if(command=='s'){
-                rbtree->search(key);
-            }
-            if(command=='d'){
-                rbtree->remove(key);
-            }
+            td[i].thread_id = i;
+            td[i].key = key;
+
+            // creating threads which execute reader function
+            pthread_create(&r[i], NULL, &reader, &td[i]);
+
+            // creating threads which execute writer function
+//            pthread_create(&w[i], NULL, &writer, &td[i]);
+
+            i++;
         }
+
+        for (int i = 0; i < size; i++) {
+            pthread_join(r[i], NULL);
+        }
+//        for (int i = 0; i < size; i++) {
+//            pthread_join(w[i], NULL);
+//        }
+
+
+
+        // synchronized execution
+
+//        for(string op: ops){
+//            char command = op.front();
+//            int key = stoi(op.substr(op.find('(')+1,op.find(')')-1));
+//            if(command=='i'){
+//                rbtree->insert(key);
+//            }
+//            if(command=='s'){
+//                rbtree->search(key,-1);
+//            }
+//            if(command=='d'){
+//                rbtree->remove(key);
+//            }
+//        }
 
         printLevelOrder(rbtree->root);
         print2D(rbtree->root);
+
+
     }
     return 0;
 }
+
+
+/*
+ *        int rc;
+        int i;
+        pthread_t threads[searchThreads];
+        pthread_attr_t attr;
+        void *status;
+        struct thread_data td[searchThreads];
+
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+        while(!readers.empty() ){
+            if(!readers.empty()){
+                string op = readers.front();
+                int key = stoi(op.substr(op.find('(')+1,op.find(')')-1));
+
+
+
+                for( i = 0; i < searchThreads; i++ ) {
+                    cout <<"main() : creating thread, " << i << endl;
+                    td[i].thread_id = i;
+                    td[i].key = key;
+                    td[i].rbtree = rbtree;
+                    rc = pthread_create(&threads[i], &attr, search, (void *)&td[i]);
+                    if (rc) {
+                        cout << "Error:unable to create thread," << rc << endl;
+                        exit(-1);
+                    }
+                }
+                pthread_attr_destroy(&attr);
+                for( i = 0; i < searchThreads; i++ ) {
+                    rc = pthread_join(threads[i], &status);
+                    if (rc) {
+                        cout << "Error:unable to join," << rc << endl;
+                        exit(-1);
+                    }
+                    cout << "Main: completed thread id :" << i ;
+                    cout << "  exiting with status :" << status << endl;
+                }
+                pthread_exit(NULL);
+                readers.pop();
+
+                i++;
+            }
+            if(!writers.empty()){
+//                writers.pop();
+            }
+        }
+ */
