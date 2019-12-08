@@ -9,8 +9,8 @@
 #include <pthread.h>
 #include <zconf.h>
 
-# define COUNT 5
-// https://www.geeksforgeeks.org/c-program-red-black-tree-insertion/
+# define COUNT 5 // for testing
+
 using namespace std;
 
 enum Color {
@@ -41,35 +41,6 @@ struct Node {
     }
 
 };
-
-void print2DUtil(Node *root, int space) {
-    // Base case
-    if (root == NULL)
-        return;
-
-    // Increase distance between levels
-    space += COUNT;
-
-    // Process right child first
-    print2DUtil(root->right, space);
-
-    // Print current node after space
-    // count
-    printf("\n");
-    for (int i = COUNT; i < space; i++)
-        printf(" ");
-    printf("(%i%c)", root->key, ((root->color) ? 'b' : 'r'));
-
-    // Process left child
-    print2DUtil(root->left, space);
-}
-
-// Wrapper over print2DUtil()
-void print2D(Node *root) {
-    // Pass initial space count as 0
-    print2DUtil(root, 0);
-    printf("\n");
-}
 
 class RedBlackTree {
 private:
@@ -183,6 +154,23 @@ void printLevelOrder(Node *root) {
         printGivenLevel(root, i);
 //        cout << endl;
     }
+    printf("\n");
+}
+
+void print2DUtil(Node *root, int space) {
+    if (root == NULL)
+        return;
+    space += COUNT;
+    print2DUtil(root->right, space);
+    printf("\n");
+    for (int i = COUNT; i < space; i++)
+        printf(" ");
+    printf("(%i%c)", root->key, ((root->color) ? 'b' : 'r'));
+    print2DUtil(root->left, space);
+}
+
+void print2D(Node *root) {
+    print2DUtil(root, 0);
     printf("\n");
 }
 
@@ -414,13 +402,13 @@ string trim(string str) {
 Node *recSearch(Node *root, int key, int thread) {
     if (root == NULL) {
         if (thread != -1) {
-            printf("False: could not find node %i on thread %i \n", key, thread);
+            printf("\"search(%i)-> false, performed by thread %i \n", key, thread);
         }
         return root;
     }
     if (root->key == key) {
         if (thread != -1) {
-            printf("True: found node %i on thread %i \n", root->key, thread);
+            printf("search(%i)-> true, performed by thread %i \n", root->key, thread);
         }
         return root;
     }
@@ -534,41 +522,15 @@ void RedBlackTree::remove_6(Node *n) {
     }
 }
 
-void *search(void *threadarg) {
-
-    struct thread_data *data;
-    data = (struct thread_data *) threadarg;
-//    RedBlackTree* rbtree = data->rbtree;
-    int key = data->key;
-    sleep(1);
-    rbtree->search(key, data->thread_id);
-//    printLevelOrder(rbtree->root);
-    pthread_exit(NULL);
-}
-
 class monitor {
 private:
-    // no. of readers
-    int rcnt;
-
-    // no. of writers
-    int wcnt;
-
-    // no. of readers waiting
-    int waitr;
-
-    // no. of writers waiting
-    int waitw;
-
-    // condition variable to check whether reader can read
+    int rcnt; // # readers reading
+    int wcnt; // # writers writing
+    int waitr; // # reader waiting
+    int waitw; // # writers waiting
     pthread_cond_t canread;
-
-    // condition variable to check whether writer can write
     pthread_cond_t canwrite;
-
-    // mutex for synchronisation
     pthread_mutex_t condlock;
-
 public:
     monitor() {
         rcnt = 0;
@@ -586,57 +548,45 @@ public:
     void beginread(int i, int key) {
         pthread_mutex_lock(&condlock);
 
-        // if there are active or waiting writers
+        // wait to read if writers are writing or waiting or if the limit for # of readers has been hit
         if (wcnt == 1 || waitw > 0 || rcnt >= readLimit) {
-            // incrementing waiting readers
             waitr++;
-
-            // reader suspended
             pthread_cond_wait(&canread, &condlock);
             waitr--;
         }
 
-        // else reader reads the resource
         rcnt++;
-        if (rcnt == 1) {
-//            pthread_cond_wait(&canwrite, &condlock);
-        }
-        printf("searching %i\n", key);
         rbtree->search(key, i);
         pthread_mutex_unlock(&condlock);
         pthread_cond_broadcast(&canread);
     }
 
     void endread(int i) {
-
-        // if there are no readers left then writer enters monitor
         pthread_mutex_lock(&condlock);
-
-        if (--rcnt == 0)
+        if (--rcnt == 0) {
             pthread_cond_signal(&canwrite);
-
+        }
         pthread_mutex_unlock(&condlock);
     }
 
     void beginwrite(int i, string op, int key) {
         pthread_mutex_lock(&condlock);
 
-        // a writer can enter when there are no active
-        // or waiting readers or other writer
-        if (wcnt == 1 || rcnt > 0 || wcnt >= writeLimit) {
+        // wait to write if there is a writer writing / if there are readers waiting / if the number of mod threads has been hit
+        if (wcnt == 1 || rcnt > 0 || waitr > 0 || wcnt >= writeLimit) {
             ++waitw;
             pthread_cond_wait(&canwrite, &condlock);
             --waitw;
         }
         wcnt = 1;
-        printf(" - BEFORE modification: %s -\n", op.c_str());
-        printLevelOrder(rbtree->root);
+//        printf(" - BEFORE modification: %s -\n", op.c_str());
+//        printLevelOrder(rbtree->root);
         if (op.front() == 'i') {
             rbtree->insert(key);
         } else {
             rbtree->remove(key);
         }
-        printf(" - AFTER modification: %s %i -\n", op.c_str(), key);
+        printf(" - AFTER: %s -\n", op.c_str());
         printLevelOrder(rbtree->root);
         pthread_mutex_unlock(&condlock);
     }
@@ -644,12 +594,12 @@ public:
     void endwrite(int i) {
         pthread_mutex_lock(&condlock);
         wcnt = 0;
-
         // if any readers are waiting, threads are unblocked
-        if (waitr > 0)
+        if (waitr > 0) {
             pthread_cond_signal(&canread);
-        else
+        } else {
             pthread_cond_signal(&canwrite);
+        }
         pthread_mutex_unlock(&condlock);
     }
 
@@ -661,21 +611,14 @@ public:
 void *reader(void *td) {
     struct thread_data *data;
     data = (struct thread_data *) td;
-    int c = 0;
     int i = (int) data->thread_id;
     while (!readers.empty()) {
-//    int key = data->key;
         string op = readers.front();
         readers.pop();
         int key = stoi(op.substr(op.find('(') + 1, op.find(')') - 1));
-
-        // each reader attempts to read 5 times
-//    while (c < readLimit) {
         usleep(1);
         M.beginread(i, key);
         M.endread(i);
-        c++;
-//    }
     }
 }
 
@@ -684,24 +627,15 @@ void *writer(void *td) {
     data = (struct thread_data *) td;
     int c = 0;
     int i = (int) data->thread_id;
-//    int key = data->key;
-//    string op = data->command;
     while (!writers.empty()) {
-
-
         string op = writers.front();
         writers.pop();
         if (!op.empty()) {
-
             int key = stoi(op.substr(op.find('(') + 1, op.find(')') - 1));
-
-            // each writer attempts to write 5 times
-//    while (c < writeLimit) {
             usleep(1);
             M.beginwrite(i, op, key);
             M.endwrite(i);
             c++;
-//    }
         }
     }
 }
@@ -769,7 +703,8 @@ int main(int argc, char **argv) {
                 writers.push(op);
             }
         }
-
+        int rqSize = readers.size();
+        int wqSize = writers.size();
         pthread_t r[searchThreads], w[modThreads];
         struct thread_data tdr[searchThreads];
         struct thread_data tdw[modThreads];
@@ -778,15 +713,14 @@ int main(int argc, char **argv) {
             tdr[i].thread_id = i;
             pthread_create(&r[i], NULL, &reader, &tdr[i]);
         }
-
         for (int i = 0; i < modThreads && !writers.empty(); i++) {
             tdw[i].thread_id = i;
             pthread_create(&w[i], NULL, &writer, &tdw[i]);
         }
-        for (int i = 0; i < searchThreads; i++) {
+        for (int i = 0; i < searchThreads && i < rqSize; i++) {
             pthread_join(r[i], NULL);
         }
-        for (int i = 0; i < modThreads; i++) {
+        for (int i = 0; i < modThreads && i < wqSize; i++) {
             pthread_join(w[i], NULL);
         }
     }
