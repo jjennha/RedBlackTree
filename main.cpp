@@ -8,13 +8,15 @@
 #include <queue>
 #include <pthread.h>
 #include <zconf.h>
+#include <ctime>
 
 # define COUNT 5 // for testing
 
 using namespace std;
 
+
 enum Color {
-    RED, BlACK
+    BlACK, RED
 };
 queue<string> readers;
 queue<string> writers;
@@ -45,34 +47,16 @@ struct Node {
 class RedBlackTree {
 private:
     void rotateLeft(Node *node);
-
     void rotateRight(Node *node);
-
-    void rbTreeify(Node *node);
-
-    void remove_1(Node *node);
-
-    void remove_2(Node *node);
-
-    void remove_3(Node *node);
-
-    void remove_4(Node *node);
-
-    void remove_5(Node *node);
-
-    void remove_6(Node *node);
-
-    void replace(Node *o, Node *n);
-
 public:
     Node *root;
 
     RedBlackTree() {
         root = NULL;
     }
-
+    void rbTreeify(Node *node);
+    void rbTreeifyDel(Node* node);
     void initialize(vector<string> *nodeData);
-
     void insert(int v);
 
     void remove(int v);
@@ -91,26 +75,18 @@ public:
         return n;
     }
 
-    Node *uncle(Node *n) {
-        if (n == NULL || n->parent == NULL || n->parent->parent == NULL) {
-            return n;
+    Node* successor(Node *p) {
+        Node *y = NULL;
+        if (p->left != NULL) {
+            y = p->left;
+            while (y->right != NULL)
+                y = y->right;
+        } else {
+            y = p->right;
+            while (y->left != NULL)
+                y = y->left;
         }
-        return sibling(n->parent);
-    }
-
-    Node *grandparent(Node *n) {
-        if (n == NULL || n->parent == NULL || n->parent->parent != NULL) {
-            return n;
-        }
-        return n->parent->parent;
-    }
-
-    Node *predecessor(Node *n) {
-        if (n == NULL) { return n; }
-        while (n->right != NULL) {
-            n = n->right;
-        }
-        return n;
+        return y;
     }
 };
 
@@ -118,8 +94,6 @@ RedBlackTree *rbtree = new RedBlackTree();
 
 struct thread_data {
     int thread_id;
-    int key;
-    string command;
 };
 
 int height(Node *node) {
@@ -140,12 +114,16 @@ void printGivenLevel(Node *root, int level) {
         return;
     }
     if (level == 1) {
-        printf("(%i%c)", root->key, ((root->color) ? 'b' : 'r'));
+        printf("(%i%c)", root->key, ((root->color==BlACK) ? 'b' : 'r'));
     } else if (level > 1) {
         printGivenLevel(root->left, level - 1);
         printGivenLevel(root->right, level - 1);
     }
 }
+/**
+ * Preorder print
+ * @param root
+ */
 void printPreorder(Node *root){
     if(root==NULL){
         printf("f ");
@@ -174,7 +152,7 @@ void print2DUtil(Node *root, int space) {
     printf("\n");
     for (int i = COUNT; i < space; i++)
         printf(" ");
-    printf("(%i%c)", root->key, ((root->color) ? 'b' : 'r'));
+    printf("(%i%c)", root->key, ((root->color==BlACK) ? 'b' : 'r'));
     print2DUtil(root->left, space);
 }
 
@@ -182,7 +160,11 @@ void print2D(Node *root) {
     print2DUtil(root, 0);
     printf("\n");
 }
-
+/**
+ * Turns string to node
+ * @param data
+ * @return
+ */
 Node *strToNode(string data) {
     Node *n;
     char color = data.back();
@@ -242,21 +224,32 @@ void RedBlackTree::initialize(vector<string> *nodes) {
  * @param node
  */
 void RedBlackTree::rotateLeft(Node *node) {
-    Node *right = node->right;
-    node->right = right->left;
-    if (node->right != NULL) {
-        node->right->parent = node;
+    if(node->right==NULL)
+        return ;
+    else
+    {
+        Node *y=node->right;
+        if(y->left!=NULL)
+        {
+            node->right=y->left;
+            y->left->parent=node;
+        }
+        else
+            node->right=NULL;
+        if(node->parent!=NULL)
+            y->parent=node->parent;
+        if(node->parent==NULL)
+            root=y;
+        else
+        {
+            if(node==node->parent->left)
+                node->parent->left=y;
+            else
+                node->parent->right=y;
+        }
+        y->left=node;
+        node->parent=y;
     }
-    right->parent = node->parent;
-    if (node->parent == NULL) {
-        root = right;
-    } else if (node == node->parent->left) {
-        node->parent->left = right;
-    } else {
-        node->parent->right = right;
-    }
-    right->left = node;
-    node->parent = right;
 }
 
 /**
@@ -264,21 +257,26 @@ void RedBlackTree::rotateLeft(Node *node) {
  * @param node
  */
 void RedBlackTree::rotateRight(Node *node) {
-    Node *left = node->left;
-    node->left = node->right;
-    if (node->left != NULL) {
-        node->left->parent = node;
+    if(node->left==NULL) {return;}
+    else{
+        Node *left=node->left;
+        if(left->right!=NULL){
+            node->left=left->right;
+            left->right->parent=node;
+        }
+        else{ node->left=NULL; }
+        if(node->parent!= NULL){ left->parent = node->parent; }
+        if(node->parent== NULL){ root = left; }
+        else {
+            if(node == node->parent->left){
+                node->parent->left= left;
+            } else{
+                node->parent->right= left;
+            }
+        }
+        left->right = node;
+        node->parent = left;
     }
-    left->parent = node->parent;
-    if (node->parent == NULL) {
-        root = left;
-    } else if (node == node->parent->left) {
-        node->parent->left = left;
-    } else {
-        node->parent->right = left;
-    }
-    left->right = node;
-    node->parent = left;
 }
 
 /**
@@ -339,7 +337,6 @@ void RedBlackTree::rbTreeify(Node *node) {
                 rotateLeft(gParentOfNode);
                 swap(parentOfNode->color, gParentOfNode->color);
                 node = parentOfNode;
-
             }
         }
     }
@@ -373,7 +370,6 @@ void RedBlackTree::insert(int v) {
     Node *node = new Node(v, RED);
     root = insertBST(root, node);
     rbTreeify(node);
-//    printLevelOrder(root);
 }
 
 /**
@@ -407,11 +403,17 @@ string trim(string str) {
     size_t last = str.find_last_not_of(' ');
     return str.substr(first, (last - first + 1));
 }
-
+/**
+ * Searches for node with value key
+ * @param root
+ * @param key
+ * @param thread
+ * @return
+ */
 Node *recSearch(Node *root, int key, int thread) {
     if (root == NULL) {
         if (thread != -1) {
-            printf("\"search(%i)-> false, performed by thread %i \n", key, thread);
+            printf("search(%i)-> false, performed by thread %i \n", key, thread);
         }
         return root;
     }
@@ -430,104 +432,119 @@ Node *recSearch(Node *root, int key, int thread) {
 Node *RedBlackTree::search(int v, int thread) {
     return recSearch(root, v, thread);
 }
-
-void RedBlackTree::replace(Node *oldn, Node *newn) {
-    if (oldn->parent == NULL) {
-        root = newn;
-    } else {
-        if (oldn == oldn->parent->left)
-            oldn->parent->left = newn;
-        else
-            oldn->parent->right = newn;
-    }
-    if (newn != NULL) {
-        newn->parent = oldn->parent;
-    }
-}
-
-void RedBlackTree::remove(int v) {
-    Node *vNode = search(v, -1);
-    if (vNode == NULL) { return; }
-    if (vNode->left != NULL && vNode->right != NULL) {
-        Node *pred = predecessor(vNode->left);
-        vNode->key = pred->key;
-        vNode = pred;
-    }
-    Node *child;
-    if (vNode->left != NULL || vNode->right != NULL) { return; }
-    child = (vNode->right == NULL) ? vNode->left : vNode->right;
-    if (vNode->color == BlACK) {
-        vNode->color = child->color;
-        remove_1(vNode);
-    }
-    replace(vNode, child);
-    rbTreeify(root);
-}
-
-void RedBlackTree::remove_1(Node *n) {
-    if (n->parent == NULL) {
-        return;
-    }
-    remove_2(n);
-}
-
-void RedBlackTree::remove_2(Node *n) {
-    if (sibling(n)->color == RED) {
-        n->parent->color = RED;
-        sibling(n)->color = BlACK;
-        if (n == n->parent->left) {
-            rotateLeft(n->parent);
-        } else {
-            rotateRight(n->parent);
+/**
+ * Fix tree from deletions
+ * @param p
+ */
+void RedBlackTree::rbTreeifyDel(Node *p) {
+    Node *s;
+    while(p!=root&&p->color==BlACK)
+    {
+        if(p->parent->left==p)
+        {
+            s=p->parent->right;
+            if(s->color==RED)
+            {
+                s->color=BlACK;
+                p->parent->color=RED;
+                rotateLeft(p->parent);
+                s=p->parent->right;
+            }
+            if(s->right->color==BlACK&&s->left->color==BlACK)
+            {
+                s->color=RED;
+                p=p->parent;
+            }
+            else
+            {
+                if(s->right->color==BlACK)
+                {
+                    s->left->color==BlACK;
+                    s->color=RED;
+                    rotateRight(s);
+                    s=p->parent->right;
+                }
+                s->color=p->parent->color;
+                p->parent->color=BlACK;
+                s->right->color=BlACK;
+                rotateLeft(p->parent);
+                p=root;
+            }
         }
+        else
+        {
+            s=p->parent->left;
+            if(s->color==RED)
+            {
+                s->color=BlACK;
+                p->parent->color=RED;
+                rotateRight(p->parent);
+                s=p->parent->left;
+            }
+            if(s->left->color==BlACK&&s->right->color==BlACK)
+            {
+                s->color=RED;
+                p=p->parent;
+            }
+            else
+            {
+                if(s->left->color==BlACK)
+                {
+                    s->right->color=BlACK;
+                    s->color=RED;
+                    rotateLeft(s);
+                    s=p->parent->left;
+                }
+                s->color=p->parent->color;
+                p->parent->color=BlACK;
+                s->left->color=BlACK;
+                rotateRight(p->parent);
+                p=root;
+            }
+        }
+        p->color=BlACK;
+        root->color=BlACK;
     }
-    remove_3(n);
 }
-
-void RedBlackTree::remove_3(Node *n) {
-    if (n->parent->color == BlACK && sibling(n)->color == BlACK
-        && sibling(n)->left->color == BlACK && sibling(n)->right->color == BlACK) {
-        sibling(n)->color = RED;
-        remove_1(n->parent);
-    } else
-        remove_4(n);
-}
-
-void RedBlackTree::remove_4(Node *n) {
-    if (n->parent->color == RED && sibling(n)->color == BlACK &&
-        sibling(n)->left->color == BlACK && sibling(n)->right->color == BlACK) {
-        sibling(n)->color = RED;
-        n->parent->color = BlACK;
-    } else
-        remove_5(n);
-}
-
-void RedBlackTree::remove_5(Node *n) {
-    if (n == n->parent->left && sibling(n)->color == BlACK &&
-        sibling(n)->left->color == RED && sibling(n)->right->color == BlACK) {
-        sibling(n)->color = RED;
-        sibling(n)->left->color = BlACK;
-        rotateRight(sibling(n));
-    } else if (n == n->parent->right && sibling(n)->color == BlACK &&
-               sibling(n)->right->color == RED && sibling(n)->left->color == BlACK) {
-        sibling(n)->color = RED;
-        sibling(n)->right->color = BlACK;
-        rotateLeft(sibling(n));
+/**
+ * // creds to geeks for geeks for helping with deletion
+ * Remove node with value v
+ * @param v
+ */
+void RedBlackTree::remove(int v) {
+    Node *node = root;
+    Node *y=NULL;
+    Node *qode=NULL;
+    int found=0;
+    Node *vNode = search(v, -1);
+    if(vNode!=NULL){
+        node = vNode;
+        found=1;
     }
-    remove_6(n);
-}
-
-void RedBlackTree::remove_6(Node *n) {
-    sibling(n)->color = n->parent->color;
-    n->parent->color = BlACK;
-    if (n == n->parent->left) {
-        if (sibling(n)->right->color != RED) { return; }
-        sibling(n)->right->color = BlACK;
-        rotateLeft(n->parent);
-    } else {
-        if (sibling(n)->left->color != RED) { return; }
-        sibling(n)->left->color = BlACK;
-        rotateRight(n->parent);
+    if(found==0)
+    {
+        cout<<"\nElement Not Found.\n";
+        return ;
+    }
+    else {
+        if(node->left==NULL||node->right==NULL){ y=node; }
+        else{ y=successor(node); }
+        if(y->left!=NULL){qode=y->left;}
+        else {
+            if(y->right!=NULL){ qode=y->right; }
+            else{ qode=NULL; }
+        }
+        if(qode!=NULL){ qode->parent=y->parent; }
+        if(y->parent==NULL){ root=qode; }
+        else{
+            if(y==y->parent->left) { y->parent->left=qode; }
+            else{ y->parent->right=qode; }
+        }
+        if(y!=node) {
+            node->color=y->color;
+            node->key=y->key;
+        }
+        if(y->color==BlACK){ rbTreeifyDel(qode); }
     }
 }
 
@@ -582,28 +599,25 @@ public:
         pthread_mutex_lock(&condlock);
 
         // wait to write if there is a writer writing / if there are readers waiting / if the number of mod threads has been hit
-        if (wcnt == 1 || rcnt > 0 || waitr > 0 || wcnt >= writeLimit) {
+        if (wcnt == 1 || rcnt > 0 || wcnt >= writeLimit) {
             ++waitw;
             pthread_cond_wait(&canwrite, &condlock);
             --waitw;
         }
         wcnt = 1;
-//        printf(" - BEFORE modification: %s -\n", op.c_str());
-//        printLevelOrder(rbtree->root);
         if (op.front() == 'i') {
             rbtree->insert(key);
         } else {
             rbtree->remove(key);
         }
-        printf(" - AFTER: %s -\n", op.c_str());
-        printLevelOrder(rbtree->root);
+//        printf(" - AFTER: %s -\n", op.c_str());
         pthread_mutex_unlock(&condlock);
     }
 
     void endwrite(int i) {
         pthread_mutex_lock(&condlock);
         wcnt = 0;
-        // if any readers are waiting, threads are unblocked
+        // if any readers are waiting, signal unblocked
         if (waitr > 0) {
             pthread_cond_signal(&canread);
         } else {
@@ -614,9 +628,11 @@ public:
 
 }
 
-// global object of monitor class
-        M;
-
+M;
+/**
+ * @param td
+ * @return
+ */
 void *reader(void *td) {
     struct thread_data *data;
     data = (struct thread_data *) td;
@@ -630,11 +646,13 @@ void *reader(void *td) {
         M.endread(i);
     }
 }
-
+/**
+ * @param td
+ * @return
+ */
 void *writer(void *td) {
     struct thread_data *data;
     data = (struct thread_data *) td;
-    int c = 0;
     int i = (int) data->thread_id;
     while (!writers.empty()) {
         string op = writers.front();
@@ -644,22 +662,25 @@ void *writer(void *td) {
             usleep(1);
             M.beginwrite(i, op, key);
             M.endwrite(i);
-            c++;
         }
     }
 }
-
+/**
+ * set read and write thread count limits
+ * @param r
+ * @param w
+ */
 void setLimits(int r, int w) {
     readLimit = r;
     writeLimit = w;
 }
 
 int main(int argc, char **argv) {
-    cout << "\n---- BEGIN ----\n" << endl;
     vector<string> nodeInputs;
     int searchThreads;
     int modThreads;
     vector<string> ops;
+    clock_t begin = clock();
 
     if (argv[1]) {
         string contents;
@@ -734,9 +755,15 @@ int main(int argc, char **argv) {
         }
     }
 //    printLevelOrder(rbtree->root);
-    print2D(rbtree->root);
+//    rbtree->rbTreeify(rbtree->root);
+//    print2D(rbtree->root);
+    clock_t end = clock();
     printPreorder(rbtree->root);
+
+    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    printf("\nTime Elapsed: %f seconds",elapsed_secs);
     printf("\n");
+
     return 0;
 }
 
